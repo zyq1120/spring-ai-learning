@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spring AI 学习助手</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f5f6f8; color: #1f2733; height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    background: #fff; border-bottom: 1px solid #e5e8ec; padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header h1 { font-size: 17px; font-weight: 600; }
+  header .meta { font-size: 12px; color: #7a8699; }
+  header .meta b { color: #2e75b6; font-weight: 600; }
+  #chat { flex: 1; overflow-y: auto; padding: 20px; max-width: 860px; width: 100%; margin: 0 auto; }
+  .msg { display: flex; margin-bottom: 16px; }
+  .msg .bubble {
+    max-width: 75%; padding: 10px 14px; border-radius: 10px;
+    font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.user { justify-content: flex-end; }
+  .msg.user .bubble { background: #2e75b6; color: #fff; border-bottom-right-radius: 3px; }
+  .msg.ai .bubble { background: #fff; border: 1px solid #e5e8ec; border-bottom-left-radius: 3px; }
+  .msg.error .bubble { background: #fdf0ef; border: 1px solid #f3c2bd; color: #a33; }
+  .empty { text-align: center; color: #98a2b3; font-size: 14px; margin-top: 80px; }
+  .empty p { margin-bottom: 8px; }
+  .chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+  .chip {
+    background: #fff; border: 1px solid #d8dee6; border-radius: 999px; padding: 6px 14px;
+    font-size: 13px; color: #41505f; cursor: pointer;
+  }
+  .chip:hover { border-color: #2e75b6; color: #2e75b6; }
+  footer { background: #fff; border-top: 1px solid #e5e8ec; padding: 14px 20px; }
+  .inputbar { max-width: 860px; margin: 0 auto; display: flex; gap: 10px; }
+  #input {
+    flex: 1; border: 1px solid #d8dee6; border-radius: 8px; padding: 10px 12px;
+    font-size: 14px; resize: none; height: 44px; font-family: inherit; outline: none;
+  }
+  #input:focus { border-color: #2e75b6; }
+  #send {
+    background: #2e75b6; color: #fff; border: none; border-radius: 8px;
+    padding: 0 22px; font-size: 14px; cursor: pointer;
+  }
+  #send:disabled { background: #a8c4de; cursor: default; }
+  #newchat {
+    background: #fff; color: #41505f; border: 1px solid #d8dee6; border-radius: 8px;
+    padding: 0 16px; font-size: 14px; cursor: pointer;
+  }
+  .typing { color: #98a2b3; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Spring AI 学习助手</h1>
+  <div class="meta">模型：<b id="model">未调用</b> · 会话：<b id="conv">新会话</b></div>
+</header>
+
+<div id="chat">
+  <div class="empty" id="empty">
+    <p>调用后端 <b>POST /ai/chat</b> 的极简前端，先配好 AI_API_KEY 再提问。</p>
+    <div class="chips">
+      <button class="chip" data-q="1070 工厂有哪些在用的物料？">1070 工厂有哪些在用的物料？</button>
+      <button class="chip" data-q="帮我说明一下采购订单的审批流程">采购订单审批流程</button>
+      <button class="chip" data-q="来料检验有哪些质量规则？">来料检验质量规则</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="inputbar">
+    <button id="newchat" title="清空并开启新会话">新会话</button>
+    <textarea id="input" placeholder="输入问题，Enter 发送，Shift+Enter 换行"></textarea>
+    <button id="send">发送</button>
+  </div>
+</footer>
+
+<script>
+  const chatEl = document.getElementById('chat');
+  const inputEl = document.getElementById('input');
+  const sendBtn = document.getElementById('send');
+  const modelEl = document.getElementById('model');
+  const convEl = document.getElementById('conv');
+  let conversationId = null;
+  let sending = false;
+
+  function addMsg(role, text) {
+    const empty = document.getElementById('empty');
+    if (empty) empty.remove();
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ' + role;
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
+    chatEl.appendChild(wrap);
+    chatEl.scrollTop = chatEl.scrollHeight;
+    return bubble;
+  }
+
+  async function send(text) {
+    const message = (text !== undefined ? text : inputEl.value).trim();
+    if (!message || sending) return;
+    sending = true;
+    sendBtn.disabled = true;
+    inputEl.value = '';
+    addMsg('user', message);
+    const pending = addMsg('ai', '思考中…');
+    pending.classList.add('typing');
+    try {
+      const resp = await fetch('/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message, conversationId: conversationId })
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      pending.classList.remove('typing');
+      pending.textContent = data.reply;
+      if (data.model) modelEl.textContent = data.model;
+      // 后端当前未回传 conversationId，后续接入会话记忆后在此更新
+      convEl.textContent = conversationId || '新会话';
+    } catch (e) {
+      pending.classList.remove('typing');
+      pending.parentElement.classList.add('error');
+      pending.textContent = '调用失败：' + e.message + '（检查后端是否启动、AI_API_KEY 是否配置）';
+    } finally {
+      sending = false;
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', () => send());
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  document.querySelectorAll('.chip').forEach(c =>
+    c.addEventListener('click', () => send(c.dataset.q)));
+  document.getElementById('newchat').addEventListener('click', () => {
+    conversationId = null;
+    chatEl.innerHTML = '';
+    convEl.textContent = '新会话';
+    location.reload();
+  });
+  inputEl.focus();
+</script>
+</body>
+</html>

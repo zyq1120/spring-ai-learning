@@ -58,6 +58,11 @@ curl -X POST http://localhost:8080/ai/chat \
 
 Apifox 中新建 POST 请求 `http://localhost:8080/ai/chat`，Body 选 JSON 填同样内容即可。
 
+**浏览器前端**：启动后直接打开 `http://localhost:8080/` —— 仓库自带一个极简聊天页
+（`src/main/resources/static/index.html`，原生 HTML/JS、零构建），可发消息、显示模型名、
+切换新会话，页面内的示例问题对应种子数据与知识库内容。后端接入会话记忆后，
+前端会自动带上 conversationId。
+
 不依赖真实 Key 的链路测试（Mock 模型）已包含在仓库里：
 
 ```bash
@@ -85,6 +90,7 @@ spring-ai-learning/
     │   └── tool/               # 第 8 周放 @Tool 工具类
     ├── main/resources/
     │   ├── application.yml     # 全部参数走环境变量
+    │   ├── static/index.html   # 极简聊天前端（原生 HTML/JS，无构建）
     │   └── knowledge/          # RAG 模拟文档 6 份（第 5-7 周）
     └── test/
 ```
