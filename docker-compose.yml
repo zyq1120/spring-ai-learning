@@ -1,0 +1,61 @@
+# 学习项目中间件：第 4-7 周才逐步使用，第 1 周可以先不启动。
+# 用法：
+#   docker compose up -d mysql          # 只起 MySQL
+#   docker compose up -d redis          # 只起 Redis
+#   docker compose up -d pgvector       # 只起 PostgreSQL + pgvector
+#   docker compose up -d                # 全部启动
+#   docker compose down                 # 停止（数据保留在 volume 里）
+#   docker compose down -v              # 停止并清掉数据（种子数据会重新灌入）
+#
+# 注意：下面都是本地学习用的弱口令，不要用在任何真实环境。
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: spring-ai-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: springai_root
+      MYSQL_DATABASE: spring_ai_learning
+      MYSQL_USER: springai
+      MYSQL_PASSWORD: springai123
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次启动自动执行建表 + 种子数据（01 -> 02 顺序）
+      - ./db/mysql:/docker-entrypoint-initdb.d:ro
+
+  redis:
+    image: redis:7
+    container_name: spring-ai-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: spring-ai-pgvector
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: spring_ai_knowledge
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: springai123
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgvector-data:/var/lib/postgresql/data
+      - ./db/postgres:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  mysql-data:
+  redis-data:
+  pgvector-data:

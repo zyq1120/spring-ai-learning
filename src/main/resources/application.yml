@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: spring-ai-learning
+  ai:
+    # OpenAI 兼容接口：换服务商只改 base-url 与 model，代码不动。
+    # 三个参数全部走环境变量，API Key 绝不写进仓库（见 .env.example）。
+    openai:
+      base-url: ${AI_BASE_URL:https://api.openai.com}
+      api-key: ${AI_API_KEY:sk-placeholder-set-AI_API_KEY-env}
+      chat:
+        options:
+          model: ${AI_MODEL:gpt-4o-mini}
+
+server:
+  port: 8080
+
+logging:
+  level:
+    org.springframework.ai: INFO
